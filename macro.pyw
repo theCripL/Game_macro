@@ -1,3 +1,5 @@
+import random
+
 import time
 from datetime import datetime
 import threading
@@ -79,6 +81,7 @@ def load_config():
                 keys = data.get("keys", DEFAULT_KEYS)
                 toggle = data.get("toggle_key", DEFAULT_TOGGLE)
                 clean_keys = [str(k).lower().strip() for k in keys if k][:5]
+                log(f"Загружены настройки: клавиши={clean_keys}, тумблер={toggle}")
                 return clean_keys, str(toggle).upper().strip()
     except Exception as e:
         log(f"Ошибка чтения конфига: {e}")
@@ -95,19 +98,45 @@ def press_up(key_name):
         interception.mouse_up(key_name)
     else:
         interception.key_up(key_name)
+def release_all(keys):
+    log("<<< [СБРОС] Отпускание клавиш...")
+    for k in reversed(keys):
+        try:
+            press_up(k)
+            time.sleep(0.02)
+        except Exception:
+            pass
+    log("<<< [УСПЕХ] Все клавиши отпущены")
+
+def press_all(keys):
+    log(f">>> [ПРОЖИМ] Удержание клавиш: {keys}")
+    for k in keys:
+        press_down(k)
+        time.sleep(0.05)
+
 
 def hold_worker():
     keys, _ = load_config()
     log(f">>> [СТАРТ] Удержание клавиш: {keys}")
     
     try:
-        for k in keys:
-            press_down(k)
-            time.sleep(0.05)
-
-        log(">>> [УДЕРЖАНИЕ АКТИВНО]")
-
+        press_all(keys)
+        
+        last_reset_time = time.time()
+        next_reset_interval = random.uniform(25, 90)
+        
         while is_active and is_running:
+            # Проверка на периодический перезапуск
+            if time.time() - last_reset_time > next_reset_interval:
+                log(f"--- [ПЕРИОДИЧЕСКИЙ ПЕРЕЗАПУСК] (прошло {int(next_reset_interval)} сек)")
+                release_all(keys)
+                time.sleep(0.05)
+                press_all(keys)
+                
+                last_reset_time = time.time()
+                next_reset_interval = random.uniform(25, 90)
+            
+            # Поддержание состояния
             for k in keys:
                 press_down(k)
             time.sleep(0.03)
@@ -116,14 +145,7 @@ def hold_worker():
         log(f"ОШИБКА в потоке удержания: {e}")
         traceback.print_exc()
     finally:
-        log("<<< [СБРОС] Отпускание клавиш...")
-        for k in reversed(keys):
-            try:
-                press_up(k)
-                time.sleep(0.02)
-            except Exception:
-                pass
-        log("<<< [УСПЕХ] Все клавиши отпущены")
+        release_all(keys)
 
 def toggle():
     global is_active, worker_thread
