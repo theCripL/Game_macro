@@ -30,6 +30,28 @@ def ensure_config():
                 json.dump({
                     "first_setup_done": True,
                     "components_verified": True,
+def get_startup_path():
+    return os.path.join(os.environ["APPDATA"], "Microsoft\\Windows\\Start Menu\\Programs\\Startup", "Game_macro.lnk")
+
+def is_autostart_enabled():
+    return os.path.exists(get_startup_path())
+
+def toggle_autostart(icon, item):
+    startup_path = get_startup_path()
+    if is_autostart_enabled():
+        os.remove(startup_path)
+        log("Автозапуск выключен")
+    else:
+        import winshell
+        from win32com.client import Dispatch
+        shell = Dispatch('WScript.Shell')
+        shortcut = shell.CreateShortCut(startup_path)
+        shortcut.TargetPath = os.path.join(BASE_DIR, "run_macro.bat")
+        shortcut.WorkingDirectory = BASE_DIR
+        shortcut.save()
+        log("Автозапуск включен")
+    icon.update_menu()
+
                     "toggle_key": DEFAULT_TOGGLE,
                     "keys": DEFAULT_KEYS
                 }, f, indent=2)
@@ -180,6 +202,11 @@ def create_tray_image():
     return image
 
 def open_settings(icon, item):
+    keys, toggle = load_config()
+    km={'left':'LMB','right':'RMB','middle':'MMB'}
+    keys_str = ', '.join([km.get(k.lower(), k.upper()) for k in keys])
+    log(f"Настройки: Тумблер={toggle}, Клавиши={keys_str}")
+    
     if os.path.exists(SETTINGS_BAT):
         try:
             os.startfile(SETTINGS_BAT)
@@ -187,6 +214,7 @@ def open_settings(icon, item):
             log(f"Ошибка открытия настроек: {e}")
     else:
         log(f"Файл {SETTINGS_BAT} не найден!")
+
 
 def exit_app(icon, item):
     global is_running, is_active
@@ -206,6 +234,7 @@ def main():
     menu = pystray.Menu(
         pystray.MenuItem("AION 2 Macro", None, enabled=False),
         pystray.MenuItem("Настройки", open_settings),
+        pystray.MenuItem(lambda item: "Автозапуск: Вкл" if is_autostart_enabled() else "Автозапуск: Выкл", toggle_autostart),
         pystray.Menu.SEPARATOR,
         pystray.MenuItem("Выход", exit_app)
     )
