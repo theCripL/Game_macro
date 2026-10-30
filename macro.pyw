@@ -30,8 +30,13 @@ def ensure_config():
                 json.dump({
                     "first_setup_done": True,
                     "components_verified": True,
+                    "toggle_key": DEFAULT_TOGGLE,
+                    "keys": DEFAULT_KEYS,
+                    "auto_restart": False
+                }, f, indent=2)
+
 def get_startup_path():
-    return os.path.join(os.environ["APPDATA"], "Microsoft\\Windows\\Start Menu\\Programs\\Startup", "Game_macro.lnk")
+    return os.path.join(os.environ["APPDATA"], "Microsoft\\Windows\\Start Menu\\Programs\\Startup", "Game Macro.lnk")
 
 def is_autostart_enabled():
     return os.path.exists(get_startup_path())
@@ -46,15 +51,11 @@ def toggle_autostart(icon, item):
         from win32com.client import Dispatch
         shell = Dispatch('WScript.Shell')
         shortcut = shell.CreateShortCut(startup_path)
-        shortcut.TargetPath = os.path.join(BASE_DIR, "run_macro.bat")
+        shortcut.TargetPath = os.path.join(BASE_DIR, "Game Macro.bat")
         shortcut.WorkingDirectory = BASE_DIR
         shortcut.save()
         log("Автозапуск включен")
     icon.update_menu()
-
-                    "toggle_key": DEFAULT_TOGGLE,
-                    "keys": DEFAULT_KEYS
-                }, f, indent=2)
 
 ensure_config()
 
@@ -110,56 +111,71 @@ def load_config():
     return DEFAULT_KEYS, DEFAULT_TOGGLE
 
 def press_down(key_name):
-    if key_name in ("left", "right", "middle"):
-        interception.mouse_down(key_name)
+    k = str(key_name).lower().strip()
+    if k in ("left", "right", "middle", "mouse4", "mouse5"):
+        interception.mouse_down(k)
     else:
-        interception.key_down(key_name)
+        interception.key_down(k)
 
 def press_up(key_name):
-    if key_name in ("left", "right", "middle"):
-        interception.mouse_up(key_name)
+    k = str(key_name).lower().strip()
+    if k in ("left", "right", "middle", "mouse4", "mouse5"):
+        interception.mouse_up(k)
     else:
-        interception.key_up(key_name)
+        interception.key_up(k)
+
 def release_all(keys):
     log("<<< [СБРОС] Отпускание клавиш...")
     for k in reversed(keys):
         try:
             press_up(k)
-            time.sleep(0.02)
         except Exception:
             pass
     log("<<< [УСПЕХ] Все клавиши отпущены")
 
-def press_all(keys):
-    log(f">>> [ПРОЖИМ] Удержание клавиш: {keys}")
-    for k in keys:
-        press_down(k)
-        time.sleep(0.05)
 
+def is_restart_enabled():
+    if os.path.exists(CONFIG_PATH):
+        try:
+            with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                return data.get('auto_restart', False)
+        except Exception:
+            pass
+    return False
 
+def toggle_restart(icon, item):
+    if os.path.exists(CONFIG_PATH):
+        try:
+            with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            current = data.get('auto_restart', False)
+            data['auto_restart'] = not current
+            
+            with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2)
+            
+            icon.update_menu()
+        except Exception as e:
+            log(f'Ошибка переключения перезапуска: {e}')
 def hold_worker():
     keys, _ = load_config()
     log(f">>> [СТАРТ] Удержание клавиш: {keys}")
     
     try:
-        press_all(keys)
-        
-        last_reset_time = time.time()
-        next_reset_interval = random.uniform(25, 90)
-        
+        for k in keys:
+            if not is_active or not is_running:
+                break
+            press_down(k)
+            time.sleep(0.05)
+
+        log(">>> [УДЕРЖАНИЕ АКТИВНО]")
+
         while is_active and is_running:
-            # Проверка на периодический перезапуск
-            if time.time() - last_reset_time > next_reset_interval:
-                log(f"--- [ПЕРИОДИЧЕСКИЙ ПЕРЕЗАПУСК] (прошло {int(next_reset_interval)} сек)")
-                release_all(keys)
-                time.sleep(0.05)
-                press_all(keys)
-                
-                last_reset_time = time.time()
-                next_reset_interval = random.uniform(25, 90)
-            
-            # Поддержание состояния
             for k in keys:
+                if not is_active or not is_running:
+                    break
                 press_down(k)
             time.sleep(0.03)
 
@@ -196,25 +212,26 @@ def key_listener():
         time.sleep(0.02)
 
 def create_tray_image():
+    icon_path = os.path.join(BASE_DIR, "icon.ico")
+    if os.path.exists(icon_path):
+        try:
+            return Image.open(icon_path)
+        except Exception:
+            pass
     image = Image.new("RGBA", (64, 64), color=(0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
-    draw.ellipse((4, 4, 60, 60), fill="#1E88E5", outline="#1565C0", width=2)
+    draw.rectangle((4, 4, 60, 60), fill="#D32F2F", outline="#B71C1C", width=2)
+    draw.text((22, 14), "G", fill="white", font=None)
     return image
 
 def open_settings(icon, item):
-    keys, toggle = load_config()
-    km={'left':'LMB','right':'RMB','middle':'MMB'}
-    keys_str = ', '.join([km.get(k.lower(), k.upper()) for k in keys])
-    log(f"Настройки: Тумблер={toggle}, Клавиши={keys_str}")
-    
     if os.path.exists(SETTINGS_BAT):
         try:
-            os.startfile(SETTINGS_BAT)
+            subprocess.Popen(["cmd.exe", "/c", SETTINGS_BAT], creationflags=subprocess.CREATE_NEW_CONSOLE)
         except Exception as e:
             log(f"Ошибка открытия настроек: {e}")
     else:
         log(f"Файл {SETTINGS_BAT} не найден!")
-
 
 def exit_app(icon, item):
     global is_running, is_active
@@ -232,14 +249,15 @@ def main():
 
     icon_image = create_tray_image()
     menu = pystray.Menu(
-        pystray.MenuItem("AION 2 Macro", None, enabled=False),
+        pystray.MenuItem("Game Macro", None, enabled=False),
         pystray.MenuItem("Настройки", open_settings),
+        pystray.MenuItem(lambda item: "Перезапуск: Вкл" if is_restart_enabled() else "Перезапуск: Выкл", toggle_restart),
         pystray.MenuItem(lambda item: "Автозапуск: Вкл" if is_autostart_enabled() else "Автозапуск: Выкл", toggle_autostart),
         pystray.Menu.SEPARATOR,
         pystray.MenuItem("Выход", exit_app)
     )
     
-    tray_icon = pystray.Icon("AION2_Macro", icon_image, "AION 2 Macro", menu)
+    tray_icon = pystray.Icon("Game_Macro", icon_image, "Game Macro", menu)
     tray_icon.run()
 
 if __name__ == "__main__":

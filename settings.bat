@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-title Настройка макроса AION 2
+title Game Macro
 
 cd /d "%~dp0"
 
@@ -17,7 +17,7 @@ echo ======================================================
 echo.
 
 if exist "%~dp0config.json" (
-    python -c "import json, os; p=os.path.join(r'%~dp0', 'config.json'); f=open(p, 'r', encoding='utf-8'); d=json.load(f); f.close(); km={'left':'LMB','right':'RMB','middle':'MMB'}; keys=', '.join([km.get(k.lower(), k.upper()) for k in d.get('keys', [])]); print('Текущие настройки:\n  Кнопка включения: ' + str(d.get('toggle_key', 'F10')) + '\n  Клавиши:          ' + keys)" 2>nul
+    python "%~dp0print_settings.py"
     echo ------------------------------------------------------
     echo.
 )
@@ -66,14 +66,14 @@ if "%toggle_btn%"=="" set "toggle_btn=F10"
     echo   "first_setup_done": true,
     echo   "components_verified": true,
     echo   "toggle_key": "%toggle_btn%",
-    echo   "keys": [!KEYS_JSON!]
+    echo   "keys": [%KEYS_JSON%]
     echo }
 ) > "%~dp0config.json"
 
 echo.
 echo ======================================================
 echo Настройки сохранены!
-python -c "import json, os; p=os.path.join(r'%~dp0', 'config.json'); f=open(p, 'r', encoding='utf-8'); d=json.load(f); f.close(); km={'left':'LMB','right':'RMB','middle':'MMB'}; keys=', '.join([km.get(k.lower(), k.upper()) for k in d.get('keys', [])]); print('  Кнопка включения: ' + str(d.get('toggle_key', 'F10')) + '\n  Клавиши:          ' + keys)" 2>nul
+python "%~dp0print_settings.py"
 echo ======================================================
 echo.
 pause
