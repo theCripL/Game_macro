@@ -16,6 +16,7 @@ SETTINGS_BAT = os.path.join(BASE_DIR, "settings.bat")
 
 DEFAULT_KEYS = ["left", "right", "e"]
 DEFAULT_TOGGLE = "F10"
+DEFAULT_DELAY = 0.02
 
 user32 = ctypes.windll.user32
 
@@ -32,6 +33,7 @@ def ensure_config():
                     "components_verified": True,
                     "toggle_key": DEFAULT_TOGGLE,
                     "keys": DEFAULT_KEYS,
+                    "delay": DEFAULT_DELAY,
                     "auto_restart": False
                 }, f, indent=2)
 
@@ -103,12 +105,13 @@ def load_config():
                 data = json.load(f)
                 keys = data.get("keys", DEFAULT_KEYS)
                 toggle = data.get("toggle_key", DEFAULT_TOGGLE)
+                delay = data.get("delay", DEFAULT_DELAY)
                 clean_keys = [str(k).lower().strip() for k in keys if k][:5]
-                log(f"Загружены настройки: клавиши={clean_keys}, тумблер={toggle}")
-                return clean_keys, str(toggle).upper().strip()
+                log(f"Загружены настройки: клавиши={clean_keys}, тумблер={toggle}, задержка={delay}")
+                return clean_keys, str(toggle).upper().strip(), float(delay)
     except Exception as e:
         log(f"Ошибка чтения конфига: {e}")
-    return DEFAULT_KEYS, DEFAULT_TOGGLE
+    return DEFAULT_KEYS, DEFAULT_TOGGLE, DEFAULT_DELAY
 
 def press_down(key_name):
     k = str(key_name).lower().strip()
@@ -160,8 +163,8 @@ def toggle_restart(icon, item):
         except Exception as e:
             log(f'Ошибка переключения перезапуска: {e}')
 def hold_worker():
-    keys, _ = load_config()
-    log(f">>> [СТАРТ] Удержание клавиш: {keys}")
+    keys, _, delay = load_config()
+    log(f">>> [СТАРТ] Удержание клавиш: {keys}, задержка: {delay}")
     
     try:
         for k in keys:
@@ -177,7 +180,7 @@ def hold_worker():
                 if not is_active or not is_running:
                     break
                 press_down(k)
-            time.sleep(0.03)
+            time.sleep(delay)
 
     except Exception as e:
         log(f"ОШИБКА в потоке удержания: {e}")
@@ -199,7 +202,7 @@ def toggle():
 def key_listener():
     last_pressed = False
     while is_running:
-        _, toggle_name = load_config()
+        _, toggle_name, _ = load_config()
         vk_code = get_virtual_key_code(toggle_name)
 
         state = user32.GetAsyncKeyState(vk_code)

@@ -47,9 +47,9 @@ for /l %%i in (1,1,%count%) do (
     if /i "!k!"=="MMB" set "k=middle"
 
     if defined KEYS_JSON (
-        set "KEYS_JSON=!KEYS_JSON!, \"!k!\""
+        set "KEYS_JSON=!KEYS_JSON!, "!k!""
     ) else (
-        set "KEYS_JSON=\"!k!\""
+        set "KEYS_JSON="!k!""
     )
 )
 
@@ -61,12 +61,21 @@ echo Нажмите Enter, чтобы оставить [F10].
 set /p toggle_btn="Кнопка включения: "
 if "%toggle_btn%"=="" set "toggle_btn=F10"
 
+echo.
+echo ------------------------------------------------------
+echo Задержка в циклах удержания (в секундах)
+echo Например: 0.02, 0.01, 0.05.
+echo Нажмите Enter, чтобы оставить [0.02].
+set /p delay_val="Задержка: "
+if "%delay_val%"=="" set "delay_val=0.02"
+
 (
     echo {
     echo   "first_setup_done": true,
     echo   "components_verified": true,
     echo   "toggle_key": "%toggle_btn%",
-    echo   "keys": [%KEYS_JSON%]
+    echo   "keys": [%KEYS_JSON%],
+    echo   "delay": %delay_val%
     echo }
 ) > "%~dp0config.json"
 

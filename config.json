@@ -2,9 +2,6 @@
   "first_setup_done": true,
   "components_verified": true,
   "toggle_key": "F10",
-  "keys": [
-    "left",
-    "right",
-    "e"
-  ]
+  "keys": ["left", "right", "e"],
+  "delay": 0.02
 }
