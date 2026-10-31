@@ -174,8 +174,25 @@ def hold_worker():
             time.sleep(0.05)
 
         log(">>> [УДЕРЖАНИЕ АКТИВНО]")
+        
+        last_reset_time = time.time()
+        next_reset_interval = random.uniform(30, 90)
 
         while is_active and is_running:
+            if is_restart_enabled():
+                if time.time() - last_reset_time > next_reset_interval:
+                    log(f"--- [ПЕРИОДИЧЕСКИЙ ПЕРЕЗАПУСК] (прошло {int(next_reset_interval)} сек)")
+                    release_all(keys)
+                    time.sleep(0.05)
+                    for k in keys:
+                        if not is_active or not is_running:
+                            break
+                        press_down(k)
+                        time.sleep(0.05)
+                    
+                    last_reset_time = time.time()
+                    next_reset_interval = random.uniform(19, 58)
+
             for k in keys:
                 if not is_active or not is_running:
                     break
